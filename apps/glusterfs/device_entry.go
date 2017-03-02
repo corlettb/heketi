@@ -269,7 +269,8 @@ func (d *DeviceEntry) NewInfoResponse(tx *bolt.Tx) (*api.DeviceInfoResponse, err
 	for _, id := range d.Bricks {
 		brick, err := NewBrickEntryFromId(tx, id)
 		if err != nil {
-			return nil, err
+			continue
+			//return nil, err
 		}
 
 		brickinfo, err := brick.NewInfoResponse(tx)
