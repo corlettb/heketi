@@ -55,27 +55,40 @@ func (s *SshExecutor) BrickCreate(host string,
 		fmt.Sprintf("mkdir -p %v", mountpoint),
 
 		// Setup the LV
-		fmt.Sprintf("lvcreate --poolmetadatasize %vK -c 256K -L %vK -T %v/%v -V %vK -n %v",
-			// MetadataSize
-			brick.PoolMetadataSize,
+		/*fmt.Sprintf("lvcreate --poolmetadatasize %vK -c 256K -L %vK -T %v/%v -V %vK -n %v",
+		// MetadataSize
+		brick.PoolMetadataSize,
+
+		//Thin Pool Size
+		brick.TpSize,
+
+		// volume group
+		s.vgName(brick.VgId),
+
+		// ThinP name
+		s.tpName(brick.Name),
+
+		// Allocation size
+		brick.Size,
+
+		// Logical Vol name
+		s.brickName(brick.Name)),*/
+
+		fmt.Sprintf("lvcreate -L %vK -n %v %v",
 
 			//Thin Pool Size
 			brick.TpSize,
 
-			// volume group
-			s.vgName(brick.VgId),
-
-			// ThinP name
-			s.tpName(brick.Name),
-
-			// Allocation size
-			brick.Size,
-
 			// Logical Vol name
-			s.brickName(brick.Name)),
+			s.brickName(brick.Name),
+
+			// volume group
+			s.vgName(brick.VgId)),
 
 		// Format
-		fmt.Sprintf("mkfs.xfs -i size=512 -n size=8192 %v", s.devnode(brick)),
+		//fmt.Sprintf("mkfs.xfs -i size=512 -n size=8192 %v", s.devnode(brick)),
+		// need to force increase traces of a previous disk exist
+		fmt.Sprintf("mkfs.xfs -f -i size=512 -n size=8192 %v", s.devnode(brick)),
 
 		// Fstab
 		fmt.Sprintf("echo \"%v %v xfs rw,inode64,noatime,nouuid 1 2\" | tee -a %v > /dev/null ",
@@ -136,11 +149,20 @@ func (s *SshExecutor) BrickDestroy(host string,
 
 	// Now try to remove the LV
 	commands = []string{
-		fmt.Sprintf("lvremove -f %v/%v", s.vgName(brick.VgId), s.tpName(brick.Name)),
+		fmt.Sprintf("lvremove -f %v/%v", s.vgName(brick.VgId), s.brickName(brick.Name)),
 	}
 	_, err = s.RemoteExecutor.RemoteCommandExecute(host, commands, 5)
 	if err != nil {
 		logger.Err(err)
+	}
+
+	// Now try to remove the LV
+	commands = []string{
+		fmt.Sprintf("lvremove -f %v/%v", s.vgName(brick.VgId), s.tpName(brick.Name)),
+	}
+	_, err = s.RemoteExecutor.RemoteCommandExecute(host, commands, 5)
+	if err != nil {
+		logger.WarnErr(err)
 	}
 
 	// Now cleanup the mount point
@@ -173,10 +195,11 @@ func (s *SshExecutor) BrickDestroyCheck(host string,
 	godbc.Require(brick.Name != "")
 	godbc.Require(brick.VgId != "")
 
-	err := s.checkThinPoolUsage(host, brick)
+	// remove this check as we aren't using thin pools
+	/*err := s.checkThinPoolUsage(host, brick)
 	if err != nil {
 		return err
-	}
+	}*/
 
 	return nil
 }
